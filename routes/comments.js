@@ -2,13 +2,13 @@
 
 var express     = require('express');
 var router      = express.Router();
-var middlewares = require('../middleware');
+var authentications = require('../middlewares/authentication');
 
 // Require controller modules
 var comments_controller = require('../controllers/commentController');
 
-// Add Authentication middleware
-router.use('/comments', middlewares.authenticateToken);
+// Add Authentication authentication
+router.use('/comments', authentications.authenticateToken);
 
 // GET /api/comments
 router.get('/comments', comments_controller.get_comments);
