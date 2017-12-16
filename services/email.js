@@ -3,7 +3,7 @@ const config = require('../config');
 const moment = require('moment');
 
 // create reusable transporter object using the default SMTP transport
-exports.transporter = nodemailer.createTransport(config.email);
+exports.transporter = nodemailer.createTransport(config.emailService);
 
 exports.mailCreatedRM = (medicalReceipt, patient, physician) => {
 

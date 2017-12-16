@@ -1,29 +1,26 @@
-var express = require('express');
-var path = require('path');
-var favicon = require('serve-favicon');
-var logger = require('morgan');
-var cookieParser = require('cookie-parser');
-var bodyParser = require('body-parser');
-var mongoose = require('mongoose');
-var config = require('./config'); // get our config file
-var jwt = require('jsonwebtoken'); // used to create, sign, and verify tokens
-var cors = require('cors');
+const express = require('express');
+const path = require('path');
+const cookieParser = require('cookie-parser');
+const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
+const config = require('./config'); // get our config file
+const logger = require('./logger'); // custom logger to db
+const morgan = require('morgan');
+const jwt = require('jsonwebtoken'); // used to create, sign, and verify tokens
+const cors = require('cors');
+const index = require('./routes/index');
+const medicalReceipts = require('./routes/medicalReceipts');
+const patients = require('./routes/patients');
+const comments = require('./routes/comments');
+const authentication = require('./routes/authentication');
+const app = express();
 
-// import routes
-var index = require('./routes/index');
-var medicalReceipts = require('./routes/medicalReceipts');
-var patients = require('./routes/patients');
-var comments = require('./routes/comments');
-var authentication = require('./routes/authentication');
+// Views Setup
+app.set('views', path.join(__dirname, 'views'));
+app.set('view engine', 'jade');
 
-var app = express();
-
-// *** mongoose *** ///
-var mongoOptions = {
-  useMongoClient: true,
-};
-
-mongoose.connect(config.mongoURI[app.get('env')], mongoOptions, error => {
+// *** mongo connection *** ///
+mongoose.connect(config.mongoURI[app.get('env')], { useMongoClient: true }, error => {
   if (error) {
     console.log('Error connecting to the database. ' + error);
   } else {
@@ -31,44 +28,45 @@ mongoose.connect(config.mongoURI[app.get('env')], mongoOptions, error => {
   }
 });
 
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'jade');
+// *** LOGGING *** //
+if (app.get('env') != 'test') app.use(logger);
+if (app.get('env') == 'development') app.use(morgan('dev'));
 
-// uncomment after placing your favicon in /public
-//app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
-if (app.get('env') != 'test') app.use(logger('dev'));
-
-// CORS
+// *** CORS *** //
 app.use(cors());
+// *** BODY PARSER *** //
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
   extended: false
 }));
+// *** COOKIE PARSER *** //
 app.use(cookieParser());
+// *** STATIC PATH *** //
 app.use(express.static(path.join(__dirname, 'public')));
 
+// *** REGISTER API ROUTES *** //
 app.use('/', index);
 app.use('/api/', medicalReceipts);
 app.use('/api/', patients);
 app.use('/api/', comments);
 app.use('/api/', authentication);
 
+// *** DEFAULT ERROR HANDLING *** //
 // catch 404 and forward to error handler
 app.use((req, res, next) => {
   var err = new Error('Not Found');
   err.status = 404;
   next(err);
 });
-
 // error handler
 app.use((err, req, res, next) => {
   // set locals, only providing error in development
   res.locals.message = err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};
-
   // render the error page
   res.status(err.status || 500);
   res.render('error');
 });
 
+// *** EXPORT APP *** //
 module.exports = app;

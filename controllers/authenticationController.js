@@ -68,7 +68,7 @@ exports.postAuthentication = function (req, res) {
                     mobile: user.mobile
                 };
                 var token = jwt.sign(payload, config.secret, {
-                    expiresIn: config.token_duration
+                    expiresIn: 3600
                 });
 
                 // return the information including token as JSON

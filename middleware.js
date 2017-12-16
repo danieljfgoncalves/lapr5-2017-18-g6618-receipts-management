@@ -44,8 +44,8 @@ exports.authenticateToMedicinesBackend = (req, res, next) => {
 
     var args = {
         data: {
-            "Email": config.medicines_backend.email,
-            "Password": config.medicines_backend.secret
+            "Email": config.medicinesManagement.email,
+            "Password": config.medicinesManagement.secret
         },
         headers: {
             "Content-Type": "application/json"
@@ -53,13 +53,13 @@ exports.authenticateToMedicinesBackend = (req, res, next) => {
     };
 
     var promise = new Promise((resolve, reject) => { // register
-        var url = config.medicines_backend.url.concat("/Account");
+        var url = config.medicinesManagement.url.concat("/Account");
         client.post(url, args, (data, response) => {
             resolve();
         })
     });
     promise.then(() => { // login
-        var url = config.medicines_backend.url.concat("/Account/Token");
+        var url = config.medicinesManagement.url.concat("/Account/Token");
         client.post(url, args, (data, response) => {
             req.token = data.token;
             next();

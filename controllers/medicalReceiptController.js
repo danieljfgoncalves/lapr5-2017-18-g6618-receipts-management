@@ -6,13 +6,12 @@ var User = require('../models/user');
 var config = require('../config');
 var nodeRestClient = require('node-rest-client');
 var async = require('async');
-var medicinesClient = require('../helpers/medicinesRequests');
+var medicinesClient = require('../services/medicinesRequests');
 var mongoose = require('mongoose');
 var Promise = require('bluebird');
 mongoose.Promise = Promise;
-const email = require('../helpers/email');
-var TMClient = require('textmagic-rest-client');
-sms = new TMClient(config.sms.username, config.sms.api_key);
+const email = require('../services/email');
+const sms = require('../services/sms');
 const moment = require('moment');
 
 // GET /api/medicalReceipts
@@ -185,8 +184,8 @@ exports.post_medical_receipt = function (req, res) {
 
             var args = {
                 data: {
-                    "Email": config.medicines_backend.email,
-                    "Password": config.medicines_backend.secret
+                    "Email": config.medicinesManagement.email,
+                    "Password": config.medicinesManagement.secret
                 },
                 headers: {
                     "Authorization": "Bearer ".concat(req.token),
@@ -302,8 +301,8 @@ exports.put_medical_receipt = async function (req, res) {
 
             var args = {
                 data: {
-                    "Email": config.medicines_backend.email,
-                    "Password": config.medicines_backend.secret
+                    "Email": config.medicinesManagement.email,
+                    "Password": config.medicinesManagement.secret
                 },
                 headers: {
                     "Authorization": "Bearer ".concat(req.token),
@@ -482,8 +481,8 @@ exports.post_prescription = function (req, res) {
 
         var args = {
             data: {
-                "Email": config.medicines_backend.email,
-                "Password": config.medicines_backend.secret
+                "Email": config.medicinesManagement.email,
+                "Password": config.medicinesManagement.secret
             },
             headers: {
                 "Authorization": "Bearer ".concat(req.token),
@@ -580,8 +579,8 @@ exports.put_prescription_by_id = function (req, res) {
 
             var args = {
                 data: {
-                    "Email": config.medicines_backend.email,
-                    "Password": config.medicines_backend.secret
+                    "Email": config.medicinesManagement.email,
+                    "Password": config.medicinesManagement.secret
                 },
                 headers: {
                     "Authorization": "Bearer ".concat(req.token),
