@@ -46,7 +46,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', index);
 // FIXME: uncomment
 app.use('/api/', medicalReceipts);
-// app.use('/api/', patients);
+app.use('/api/', patients);
 app.use('/api/', authentication);
 
 // *** DEFAULT ERROR HANDLING *** //
