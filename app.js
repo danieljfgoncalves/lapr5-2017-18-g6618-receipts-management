@@ -6,12 +6,10 @@ const mongoose = require('mongoose');
 const config = require('./config'); // get our config file
 const logger = require('./logger'); // custom logger to db
 const morgan = require('morgan');
-const jwt = require('jsonwebtoken'); // used to create, sign, and verify tokens
 const cors = require('cors');
 const index = require('./routes/index');
 const medicalReceipts = require('./routes/medicalReceipts');
 const patients = require('./routes/patients');
-const comments = require('./routes/comments');
 const authentication = require('./routes/authentication');
 const app = express();
 
@@ -46,9 +44,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // *** REGISTER API ROUTES *** //
 app.use('/', index);
+// FIXME: uncomment
 app.use('/api/', medicalReceipts);
-app.use('/api/', patients);
-app.use('/api/', comments);
+// app.use('/api/', patients);
 app.use('/api/', authentication);
 
 // *** DEFAULT ERROR HANDLING *** //
@@ -58,15 +56,17 @@ app.use((req, res, next) => {
   err.status = 404;
   next(err);
 });
-// error handler
+// // error handler
 app.use((err, req, res, next) => {
   // set locals, only providing error in development
-  res.locals.message = err.message;
+  res.locals.message = req.method + ' ' + req.url + ' : ' + err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};
   // render the error page
   res.status(err.status || 500);
   res.render('error');
 });
+
+app.listen(3100, () => console.log('Receipts Management listening on port 3100!'));
 
 // *** EXPORT APP *** //
 module.exports = app;

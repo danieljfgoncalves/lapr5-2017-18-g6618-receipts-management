@@ -74,3 +74,4 @@ typings/
 .Trashes
 ehthumbs.db
 Thumbs.db
+/.vscode/settings.json

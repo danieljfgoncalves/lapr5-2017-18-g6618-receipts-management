@@ -2,7 +2,6 @@
 
 var roles = require('../models/roles');
 var MedicalReceipt = require('../models/medicalReceipt');
-var User = require('../models/user');
 var config = require('../config');
 var nodeRestClient = require('node-rest-client');
 var async = require('async');
@@ -13,132 +12,69 @@ mongoose.Promise = Promise;
 const email = require('../services/email');
 const sms = require('../services/sms');
 const moment = require('moment');
+const auth = require('./authenticationController');
+const request = require('request');
+const userServices = require('../services/userServices');
 
 // GET /api/medicalReceipts
 exports.get_medical_receipts_list = function (req, res) {
 
-    if (req.roles.includes(roles.Role.ADMIN)) {
+    if (userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN, roles.Role.PATIENT, roles.Role.PHYSICIAN])) {
 
-        MedicalReceipt.find(function (err1, medicalReceipts) {
-            if (err1) {
-                res.status(500).send(err1);
-            }
-            var mrs = [];
-            var patientDTO, physicianDTO;
-            async.each(medicalReceipts, (medicalReceipt, callback) => {
-
-                new Promise( (resolve, reject) => {
-                    User.findById(medicalReceipt.patient, (err, user) => {
-                        var data = {};
-                        data.patientDTO = {
-                            roles: user.roles,
-                            userID: user._id,
-                            name: user.name,
-                            email: user.email,
-                            mobile: user.mobile
-                        };
-                        resolve(data);
-                    });
-                }).then(data => {
-                    return new Promise( (resolve, reject) => {
-                        User.findById(medicalReceipt.physician, (err, user) => {
-                            data.physicianDTO = {
-                                roles: user.roles,
-                                userID: user._id,
-                                name: user.name,
-                                email: user.email,
-                                mobile: user.mobile
-                            };
-                            resolve(data);
-                        });
-                    });
-                }).then(data => {
-                    var medicalReceiptDTO = {
-                        "_id": medicalReceipt._id,
-                        "patient": data.patientDTO,
-                        "physician": data.physicianDTO,
-                        "prescriptions": medicalReceipt.prescriptions,
-                        "creationDate":  medicalReceipt.creationDate
-                    };
-                    mrs.push(medicalReceiptDTO);
-                    callback();
-                });
-
-            }, err2 => {
-                if (err2) {
-                    res.status(500).send(err2);
-                }
-                res.status(200).json(mrs);
-            })
-        });
-    } else if (req.roles.includes(roles.Role.PHYSICIAN) ||
-        req.roles.includes(roles.Role.PATIENT)) {
-
-        var query;
-        if (req.roles.includes(roles.Role.PHYSICIAN)) {
+        var query = {};
+        if (userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.PHYSICIAN])) {
             query = {
-                "physician": req.userID
-            }
-        } else {
+                "physician": req.user.sub
+            };
+        } else if (userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.PATIENT])) {
             query = {
-                "patient": req.userID
-            }
+                "patient": req.user.sub
+            };
         }
 
-        MedicalReceipt.find(query, function (err, medicalReceipts) {
+        MedicalReceipt.find(query, (err, medicalReceipts) => {
             if (err) {
-                res.status(500).send(err);
+                res.status(500).json({
+                    message: "Internal Error.",
+                    error: err
+                });
             }
             var mrs = [];
-            var patientDTO, physicianDTO;
             async.each(medicalReceipts, (medicalReceipt, callback) => {
-
-                new Promise( (resolve, reject) => {
-                    User.findById(medicalReceipt.patient, (err, user) => {
-                        var data = {};
-                        data.patientDTO = {
-                            roles: user.roles,
-                            userID: user._id,
-                            name: user.name,
-                            email: user.email,
-                            mobile: user.mobile
+                // medicalReceipt.patient
+                // medicalReceipt.physician
+                Promise.join(
+                    userServices.getUser(req.accessToken, medicalReceipt.patient),
+                    userServices.getUser(req.accessToken, medicalReceipt.physician),
+                    (patient, physician) => {
+                        var medicalReceiptDTO = {
+                            "_id": medicalReceipt._id,
+                            "patient": patient,
+                            "physician": physician,
+                            "prescriptions": medicalReceipt.prescriptions,
+                            "creationDate": medicalReceipt.creationDate
                         };
-                        resolve(data);
+                        // remove roles from users
+                        delete medicalReceiptDTO.patient.roles;
+                        delete medicalReceiptDTO.physician.roles;
+
+                        mrs.push(medicalReceiptDTO);
+                        callback();
                     });
-                }).then(data => {
-                    return new Promise( (resolve, reject) => {
-                        User.findById(medicalReceipt.physician, (err, user) => {
-                            data.physicianDTO = {
-                                roles: user.roles,
-                                userID: user._id,
-                                name: user.name,
-                                email: user.email,
-                                mobile: user.mobile
-                            };
-                            resolve(data);
-                        });
-                    });
-                }).then(data => {
-                    var medicalReceiptDTO = {
-                        "_id": medicalReceipt._id,
-                        "patient": data.patientDTO,
-                        "physician": data.physicianDTO,
-                        "prescriptions": medicalReceipt.prescriptions,
-                        "creationDate":  medicalReceipt.creationDate
-                    };
-                    mrs.push(medicalReceiptDTO);
-                    callback();
-                });
 
             }, err2 => {
                 if (err2) {
-                    res.status(500).send(err2);
+                    res.status(500).json({
+                        error: err2
+                    });
                 }
                 res.status(200).json(mrs);
-            })
+            });
         });
     } else {
-        res.status(401).send('Unauthorized User.');
+        res.status(401).json({
+            message: 'Unauthorized User.'
+        });
     }
 };
 
@@ -147,17 +83,39 @@ exports.get_medical_receipt = function (req, res) {
 
     MedicalReceipt.findById(req.params.id, function (err, medicalReceipt) {
         if (err) {
-            res.send(err);
+            res.json({
+                error: err
+            });
         }
 
-        var b1 = req.roles.includes(roles.Role.ADMIN);
-        var b2 = req.roles.includes(roles.Role.PHARMACIST);
-        var b3 = req.roles.includes(roles.Role.PATIENT) && req.userID == medicalReceipt.patient;
-        var b4 = req.roles.includes(roles.Role.PHYSICIAN) && req.userID == medicalReceipt.physician;
-        if (b1 || b2 || b3 || b4) {
-            res.status(200).json(medicalReceipt);
+        var b1 = userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN, roles.Role.PHARMACIST]);
+        var b2 = req.user["https://lapr5.isep.pt/roles"].includes(roles.Role.PATIENT) && req.user.sub == medicalReceipt.patient;
+        var b3 = req.user["https://lapr5.isep.pt/roles"].includes(roles.Role.PHYSICIAN) && req.user.sub == medicalReceipt.physician;
+        if (b1 || b2 || b3) {
+
+            // medicalReceipt.patient
+            // medicalReceipt.physician
+            Promise.join(
+                userServices.getUser(req.accessToken, medicalReceipt.patient),
+                userServices.getUser(req.accessToken, medicalReceipt.physician),
+                (patient, physician) => {
+                    var medicalReceiptDTO = {
+                        "_id": medicalReceipt._id,
+                        "patient": patient,
+                        "physician": physician,
+                        "prescriptions": medicalReceipt.prescriptions,
+                        "creationDate": medicalReceipt.creationDate
+                    };
+                    // remove roles from users
+                    delete medicalReceiptDTO.patient.roles;
+                    delete medicalReceiptDTO.physician.roles;
+
+                    res.status(200).json(medicalReceiptDTO);
+                });
         } else {
-            res.status(401).send('Unauthorized User.');
+            res.status(401).json({
+                message: 'Unauthorized User.'
+            });
         }
     });
 };
@@ -165,76 +123,77 @@ exports.get_medical_receipt = function (req, res) {
 // POST /api/medicalReceipts
 exports.post_medical_receipt = function (req, res) {
 
-    if (!(req.roles.includes(roles.Role.ADMIN) ||
-            req.roles.includes(roles.Role.PHYSICIAN))) {
-        res.status(401).send('Unauthorized User.');
+    if (!userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN, roles.Role.PHYSICIAN])) {
+        res.status(401).json({
+            message: 'Unauthorized User.'
+        });
         return;
     }
 
     var medicalReceipt = new MedicalReceipt();
 
     medicalReceipt.creationDate = req.body.creationDate;
-    medicalReceipt.physician = req.userID;
+    medicalReceipt.physician = req.user.sub;
     medicalReceipt.patient = req.body.patient;
 
     async.each(
         req.body.prescriptions,
-
         (item, callback) => {
 
             var args = {
-                data: {
-                    "Email": config.medicinesManagement.email,
-                    "Password": config.medicinesManagement.secret
-                },
                 headers: {
-                    "Authorization": "Bearer ".concat(req.token),
-                    "Content-Type": "application/json"
+                    "Authorization": "Bearer " + req.medicinesToken.access_token,
+                    'content-type': 'application/json'
                 }
             };
 
-            Promise.join(
-                medicinesClient.getDrug(args, item.drug),
-                medicinesClient.getMedicine(args, item.medicine),
-                medicinesClient.getPresentation(args, item.presentation),
-                medicinesClient.getPosology(args, item.posology),
-                function (drug, medicine, presentation, posology) {
+            new Promise((resolve, rejected) => {
+                resolve(medicinesClient.getMedicineData(args, item.presentation, item.medicine, item.posology));
+            }).then((data) => {
 
-                    var prescription = {
-                        "expirationDate": item.expirationDate,
-                        "drug": drug.name,
-                        "medicine": medicine.name,
-                        "quantity": item.quantity,
-                        "prescribedPosology": {
-                            "quantity": posology.quantity,
-                            "technique": posology.technique,
-                            "interval": posology.interval,
-                            "period": posology.period
-                        },
-                        "presentation": {
-                            "form": presentation.form,
-                            "concentration": presentation.concentration,
-                            "quantity": presentation.quantity
-                        }
+                var prescription = {
+                    "expirationDate": item.expirationDate,
+                    "drug": data.drug,
+                    "medicine": data.medicine,
+                    "quantity": item.quantity,
+                    "presentation": {
+                        "form": data.presentation.form,
+                        "concentration": data.presentation.concentration,
+                        "quantity": data.presentation.quantity
+                    }
+                };
+
+                if (item.posology != undefined) {
+                    prescription.prescribedPosology = {
+                        "quantity": data.posology.dosage,
+                        "technique": data.posology.technique,
+                        "interval": data.posology.interval,
+                        "period": data.posology.period
                     };
-                    medicalReceipt.prescriptions.push(prescription);
-                    callback();
-                });
+                } else {
+                    prescription.prescribedPosology = {
+                        "quantity": item.prescribedPosology.dosage,
+                        "technique": item.prescribedPosology.technique,
+                        "interval": item.prescribedPosology.interval,
+                        "period": item.prescribedPosology.period
+                    };
+                }
+                medicalReceipt.prescriptions.push(prescription);
+                callback();
+            });
         },
         (error) => {
             // save the medical receipt and check for errors
             medicalReceipt.save(err => {
                 if (err) {
-                    res.status(500).send(err);
+                    res.status(500).json({
+                        error: err
+                    });
                 }
 
                 Promise.join(
-                    User.findOne({
-                        _id: req.body.patient
-                    }).exec(),
-                    User.findOne({
-                        _id: req.userID
-                    }).exec(),
+                    userServices.getUser(req.accessToken, req.body.patient),
+                    userServices.getUser(req.accessToken, req.user.sub),
                     async(patient, physician) => {
                         // send sms // put directly in mlabs "mobile": "+351936523509" because of credit
                         if (patient.mobile) {
@@ -275,21 +234,24 @@ exports.put_medical_receipt = async function (req, res) {
     var physicianID;
     await MedicalReceipt.findById(req.params.id, function (err, medicalReceipt) {
         physicianID = medicalReceipt.physician;
-
         var hasFills = false;
         medicalReceipt.prescriptions.forEach(element => {
             hasFills |= element.fills.length > 0;
         });
-
-        if (hasFills) {
-            res.status(401).send('Unauthorized User.');
+        if (hasFills || !medicalReceipt) {
+            res.status(403).send({
+                message: 'Update Forbidden'
+            });
             return;
         }
     });
 
-    if (!(req.roles.includes(roles.Role.ADMIN) ||
-            (req.roles.includes(roles.Role.PHYSICIAN) && req.userID == physicianID))) {
-        res.status(401).send('Unauthorized User.');
+    var b1 = userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN]);
+    var b2 = req.user["https://lapr5.isep.pt/roles"].includes(roles.Role.PHYSICIAN) && req.user.sub == physicianID;
+    if (!(b1 || b2)) {
+        res.status(401).json({
+            message: 'Unauthorized User.'
+        });
         return;
     }
 
@@ -300,66 +262,67 @@ exports.put_medical_receipt = async function (req, res) {
         (item, callback) => {
 
             var args = {
-                data: {
-                    "Email": config.medicinesManagement.email,
-                    "Password": config.medicinesManagement.secret
-                },
                 headers: {
-                    "Authorization": "Bearer ".concat(req.token),
-                    "Content-Type": "application/json"
+                    "Authorization": "Bearer " + req.medicinesToken.access_token,
+                    'content-type': 'application/json'
                 }
             };
 
-            Promise.join(
-                medicinesClient.getDrug(args, item.drug),
-                medicinesClient.getMedicine(args, item.medicine),
-                medicinesClient.getPresentation(args, item.presentation),
-                medicinesClient.getPosology(args, item.posology),
-                function (drug, medicine, presentation, posology) {
+            new Promise((resolve, rejected) => {
+                resolve(medicinesClient.getMedicineData(args, item.presentation, item.medicine, item.posology));
+            }).then((data) => {
 
-                    var prescription = {
-                        "expirationDate": item.expirationDate,
-                        "drug": drug.name,
-                        "medicine": medicine.name,
-                        "quantity": item.quantity,
-                        "prescribedPosology": {
-                            "quantity": posology.quantity,
-                            "technique": posology.technique,
-                            "interval": posology.interval,
-                            "period": posology.period
-                        },
-                        "presentation": {
-                            "form": presentation.form,
-                            "concentration": presentation.concentration,
-                            "quantity": presentation.quantity
-                        }
+                var prescription = {
+                    "expirationDate": item.expirationDate,
+                    "drug": data.drug,
+                    "medicine": data.medicine,
+                    "quantity": item.quantity,
+                    "presentation": {
+                        "form": data.presentation.form,
+                        "concentration": data.presentation.concentration,
+                        "quantity": data.presentation.quantity
+                    }
+                };
+
+                if (item.posology != undefined) {
+                    prescription.prescribedPosology = {
+                        "quantity": data.posology.dosage,
+                        "technique": data.posology.technique,
+                        "interval": data.posology.interval,
+                        "period": data.posology.period
                     };
-                    newPrescriptions.push(prescription);
-                    callback();
-                })
+                } else {
+                    prescription.prescribedPosology = {
+                        "quantity": item.prescribedPosology.dosage,
+                        "technique": item.prescribedPosology.technique,
+                        "interval": item.prescribedPosology.interval,
+                        "period": item.prescribedPosology.period
+                    };
+                }
+                newPrescriptions.push(prescription);
+                callback();
+            });
         },
         error => {
             // update the medical receipt and check for errors
             MedicalReceipt.findOneAndUpdate({
                 _id: req.params.id
             }, {
-                physician: req.userID,
+                physician: req.user.sub,
                 patient: req.body.patient,
                 creationDate: req.body.creationDate,
                 prescriptions: newPrescriptions
             }, (err, medicalReceipt) => {
 
                 if (err) {
-                    res.status(500).send(err);
+                    res.status(500).json({
+                        error: err
+                    });
                 }
 
                 Promise.join(
-                    User.findOne({
-                        _id: req.body.patient
-                    }).exec(),
-                    User.findOne({
-                        _id: req.userID
-                    }).exec(),
+                    userServices.getUser(req.accessToken, req.body.patient),
+                    userServices.getUser(req.accessToken, req.user.sub),
                     (patient, physician) => {
                         // send mail with defined transport object
                         email.transporter.sendMail(email.mailUpdatedRM(medicalReceipt, patient, physician), (error, info) => {
@@ -367,7 +330,7 @@ exports.put_medical_receipt = async function (req, res) {
                                 res.status(200).json({
                                     message: 'Medical Receipt Updated, but email notification failed!'
                                 });
-                                return console.log(error);
+                                return;
                             }
                             console.log('Email sent: %s', info.messageId);
                             res.status(200).json({
@@ -382,8 +345,10 @@ exports.put_medical_receipt = async function (req, res) {
 // DELETE /api/medicalReceipts/{id}
 exports.delete_medical_receipt = function (req, res) {
 
-    if (!req.roles.includes(roles.Role.ADMIN)) {
-        res.status(401).send('Unauthorized User.');
+    if (!userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN])) {
+        res.status(401).json({
+            message: 'Unauthorized User.'
+        });
         return;
     }
 
@@ -408,39 +373,42 @@ exports.get_prescriptions_by_id = function (req, res) {
 
     MedicalReceipt.findById(req.params.id, function (err, medicalReceipt) {
         if (err) {
-            res.send(err);
+            res.json({
+                error: err
+            });
         }
 
-        var b1 = req.roles.includes(roles.Role.ADMIN);
-        var b2 = req.roles.includes(roles.Role.PHARMACIST);
-        var b3 = req.roles.includes(roles.Role.PATIENT) && req.userID == medicalReceipt.patient;
-        var b4 = req.roles.includes(roles.Role.PHYSICIAN) && req.userID == medicalReceipt.physician;
-        if (b1 || b2 || b3 || b4) {
+        var b1 = userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN, roles.Role.PHARMACIST]);
+        var b2 = req.user["https://lapr5.isep.pt/roles"].includes(roles.Role.PATIENT) && req.user.sub == medicalReceipt.patient;
+        var b3 = req.user["https://lapr5.isep.pt/roles"].includes(roles.Role.PHYSICIAN) && req.user.sub == medicalReceipt.physician;
+        if (b1 || b2 || b3) {
 
             res.status(200).json(medicalReceipt.prescriptions);
         } else {
-            res.status(401).send('Unauthorized User.');
+            res.status(401).json({
+                message: 'Unauthorized User.'
+            });
         }
     });
 }
 
 // POST /api/MedicalReceipts/{id1}/Prescriptions/{id2}/Fills
 exports.post_fill_prescription = (req, res) => {
-    if (!(req.roles.includes(roles.Role.ADMIN) ||
-            req.roles.includes(roles.Role.PHARMACIST))) {
-
-        res.status(401).send('Unauthorized User.');
+    if (!userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN, roles.Role.PHARMACIST])) {
+        res.status(401).json({
+            message: 'Unauthorized User.'
+        });
         return;
     }
     MedicalReceipt.findById(req.params.id1, (err, medicalReceipt) => {
         if (err) {
-            res.send(err);
+            res.json({error: err});
             return;
         }
 
         var prescription = medicalReceipt._doc.prescriptions.find(e => e._id == req.params.id2);
         if (!prescription) {
-            res.status(404).send("The prescription doesn't exists.");
+            res.status(404).json({message:"The prescription doesn't exists."});
             return;
         }
 
@@ -450,17 +418,20 @@ exports.post_fill_prescription = (req, res) => {
         });
 
         if (req.body.quantity > availableFills) {
-            res.status(400).send("The quantity is bigger than the available [Remaining: " + availableFills + "].");
+            res.status(403).json({message:"The quantity is bigger than the available [Remaining: " + availableFills + "]."});
             return;
         }
 
         prescription._doc.fills.push(req.body);
         medicalReceipt.save(function (err) {
             if (err) {
-                res.send(err);
+                res.json({error: err});
             }
             res.status(200).json({
-                message: 'Medical Receipt Updated!'
+                message: 'Presciption Filled!',
+                availableQty: availableFills - req.body.quantity,
+                medicalReceipt: medicalReceipt._id,
+                prescription: prescription._id
             });
         });
     });
@@ -469,62 +440,74 @@ exports.post_fill_prescription = (req, res) => {
 // POST /api/medicalReceipts/{id1}/Prescriptions/
 exports.post_prescription = function (req, res) {
 
-    if (!(req.roles.includes(roles.Role.ADMIN) ||
-            req.roles.includes(roles.Role.PHYSICIAN))) {
-        res.status(401).send('Unauthorized User.');
-        return;
-    }
     MedicalReceipt.findById(req.params.id, function (err, medicalReceipt) {
         if (err) {
-            res.send(err);
+            res.json({
+                error: err
+            });
+        }
+
+        var b1 = userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN]);
+        var b2 = userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.PHYSICIAN]) &&
+            req.user.sub == medicalReceipt.physician;
+        if (! (b1 || b2) ) {
+            res.status(401).json({
+                message: 'Unauthorized User.'
+            });
+            return;
         }
 
         var args = {
-            data: {
-                "Email": config.medicinesManagement.email,
-                "Password": config.medicinesManagement.secret
-            },
             headers: {
-                "Authorization": "Bearer ".concat(req.token),
-                "Content-Type": "application/json"
+                "Authorization": "Bearer " + req.medicinesToken.access_token,
+                'content-type': 'application/json'
             }
         };
 
-        Promise.join(
-            medicinesClient.getDrug(args, req.body.drug),
-            medicinesClient.getMedicine(args, req.body.medicine),
-            medicinesClient.getPresentation(args, req.body.presentation),
-            medicinesClient.getPosology(args, req.body.posology),
-            function (drug, medicine, presentation, posology) {
+        new Promise((resolve, rejected) => {
+            resolve(medicinesClient.getMedicineData(args, req.body.presentation, req.body.medicine, req.body.posology));
+        }).then((data) => {
 
-                var prescription = {
-                    "expirationDate": req.body.expirationDate,
-                    "drug": drug.name,
-                    "medicine": medicine.name,
-                    "quantity": item.quantity,
-                    "prescribedPosology": {
-                        "quantity": posology.quantity,
-                        "technique": posology.technique,
-                        "interval": posology.interval,
-                        "period": posology.period
-                    },
-                    "presentation": {
-                        "form": presentation.form,
-                        "concentration": presentation.concentration,
-                        "quantity": presentation.quantity
-                    }
+            var prescription = {
+                "expirationDate": req.body.expirationDate,
+                "drug": data.drug,
+                "medicine": data.medicine,
+                "quantity": req.body.quantity,
+                "presentation": {
+                    "form": data.presentation.form,
+                    "concentration": data.presentation.concentration,
+                    "quantity": data.presentation.quantity
+                }
+            };
+
+            if (req.body.posology != undefined) {
+                prescription.prescribedPosology = {
+                    "quantity": data.posology.dosage,
+                    "technique": data.posology.technique,
+                    "interval": data.posology.interval,
+                    "period": data.posology.period
                 };
-                medicalReceipt.prescriptions.push(prescription);
-                // save the medical receipt and check for errors
-                medicalReceipt.save(err => {
-                    if (err) {
-                        res.status(500).send(err);
-                    }
-                    res.status(201).json({
-                        message: 'Prescription Created & Added to Medical Receipt!'
+            } else {
+                prescription.prescribedPosology = {
+                    "quantity": req.body.prescribedPosology.dosage,
+                    "technique": req.body.prescribedPosology.technique,
+                    "interval": req.body.prescribedPosology.interval,
+                    "period": req.body.prescribedPosology.period
+                };
+            }
+            medicalReceipt.prescriptions.push(prescription);
+            // save the medical receipt and check for errors
+            medicalReceipt.save(err => {
+                if (err) {
+                    res.status(500).json({
+                        error: err
                     });
+                }
+                res.status(201).json({
+                    message: 'Prescription Created & Added to Medical Receipt!'
                 });
-            })
+            });
+        });
     });
 
 }
@@ -534,24 +517,30 @@ exports.get_prescription_by_id = function (req, res) {
 
     MedicalReceipt.findById(req.params.receiptId, function (err, medicalReceipt) {
         if (err) {
-            res.status(500).send(err);
+            res.json({
+                error: err
+            });
         }
-        var b1 = req.roles.includes(roles.Role.ADMIN);
-        var b2 = req.roles.includes(roles.Role.PHARMACIST);
-        var b3 = req.roles.includes(roles.Role.PATIENT) && req.userID == medicalReceipt.patient;
-        var b4 = req.roles.includes(roles.Role.PHYSICIAN) && req.userID == medicalReceipt.physician;
-        if (b1 || b2 || b3 || b4) {
+
+        var b1 = userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN, roles.Role.PHARMACIST]);
+        var b2 = req.user["https://lapr5.isep.pt/roles"].includes(roles.Role.PATIENT) && req.user.sub == medicalReceipt.patient;
+        var b3 = req.user["https://lapr5.isep.pt/roles"].includes(roles.Role.PHYSICIAN) && req.user.sub == medicalReceipt.physician;
+        if (b1 || b2 || b3) {
 
             var prescription = medicalReceipt.prescriptions.id(req.params.prescId);
 
             if (!prescription) {
-                res.status(404).send("The prescription doesn't exists.");
+                res.status(404).json({
+                    message: "The prescription doesn't exists."
+                });
                 return;
             }
 
             res.status(200).json(prescription);
         } else {
-            res.status(401).send('Unauthorized User.');
+            res.status(401).json({
+                message: 'Unauthorized User.'
+            });
         }
     });
 }
@@ -561,76 +550,89 @@ exports.put_prescription_by_id = function (req, res) {
 
     MedicalReceipt.findById(req.params.receiptId, function (err, medicalReceipt) {
         if (err) {
-            res.status(500).send(err);
+            res.status(500).json({
+                error: err
+            });
         }
 
-        if (req.roles.includes(roles.Role.ADMIN) ||
-            (req.roles.includes(roles.Role.PHYSICIAN) && req.userID == medicalReceipt.physician)) {
+        var b1 = userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN]);
+        var b2 = req.user["https://lapr5.isep.pt/roles"].includes(roles.Role.PHYSICIAN) && req.user.sub == medicalReceipt.physician;
+        if (b1 || b2) {
 
             var prescription = medicalReceipt.prescriptions.id(req.params.prescId);
 
             if (!prescription) {
-                res.status(404).send("The prescription doesn't exists.");
+                res.status(404).json({
+                    message: "The prescription doesn't exists."
+                });
                 return;
             } else if (prescription.fills.length > 0) {
-                res.status(401).send('The prescription has been filled & can\'t be changed');
+                res.status(403).send({
+                    message: 'The prescription has been filled & can\'t be changed'
+                });
                 return;
             }
 
             var args = {
-                data: {
-                    "Email": config.medicinesManagement.email,
-                    "Password": config.medicinesManagement.secret
-                },
                 headers: {
-                    "Authorization": "Bearer ".concat(req.token),
-                    "Content-Type": "application/json"
+                    "Authorization": "Bearer " + req.medicinesToken.access_token,
+                    'content-type': 'application/json'
                 }
             };
 
-            Promise.join(
-                medicinesClient.getDrug(args, req.body.drug),
-                medicinesClient.getMedicine(args, req.body.medicine),
-                medicinesClient.getPresentation(args, req.body.presentation),
-                medicinesClient.getPosology(args, req.body.posology),
-                function (drug, medicine, presentation, posology) {
+            new Promise((resolve, rejected) => {
+                resolve(medicinesClient.getMedicineData(args, req.body.presentation, req.body.medicine, req.body.posology));
+            }).then((data) => {
 
-                    if (req.body.expirationDate) prescription.expirationDate = req.body.expirationDate;
-                    if (drug) prescription.drug = drug.name;
-                    if (medicine) prescription.medicine = medicine.name;
-                    if (req.body.quantity) prescription.quantity = req.body.quantity;
-                    if (posology) {
-                        prescription.prescribedPosology = {
-                            "quantity": posology.quantity,
-                            "technique": posology.technique,
-                            "interval": posology.interval,
-                            "period": posology.period
-                        }
+                if (req.body.expirationDate) prescription.expirationDate = req.body.expirationDate;
+                if (data.drug) prescription.drug = data.drug.name;
+                if (data.medicine) prescription.medicine = data.medicine.name;
+                if (req.body.quantity) prescription.quantity = req.body.quantity;
+                if (data.posology) {
+                    prescription.prescribedPosology = {
+                        "quantity": data.posology.quantity,
+                        "technique": data.posology.technique,
+                        "interval": data.posology.interval,
+                        "period": data.posology.period
                     }
-                    if (presentation) {
-                        prescription.presentation = {
-                            "form": presentation.form,
-                            "concentration": presentation.concentration,
-                            "quantity": presentation.quantity
-                        }
+                } else if (req.body.prescribedPosology) {
+                    prescription.prescribedPosology = {
+                        "quantity": req.body.prescribedPosology.dosage,
+                        "technique": req.body.prescribedPosology.technique,
+                        "interval": req.body.prescribedPosology.interval,
+                        "period": req.body.prescribedPosology.period
+                    };
+                }
+                if (data.presentation) {
+                    prescription.presentation = {
+                        "form": data.presentation.form,
+                        "concentration": data.presentation.concentration,
+                        "quantity": data.presentation.quantity
                     }
+                }
 
-                    // // // Update prescription
-                    prescription.save(err => {
-                        if (err) res.status(500).send(err);
+                // Update prescription
+                prescription.save(err => {
+                    if (err) res.status(500).json({
+                        error: err
                     });
-                    // update the medical receipt and check for errors
-                    medicalReceipt.save(err => {
-                        if (err) res.status(500).send(err);
+                });
+                // update the medical receipt and check for errors
+                medicalReceipt.save(err => {
+                    if (err) res.status(500).json({
+                        error: err
+                    });
 
-                        res.status(200).json({
-                            message: 'Prescription was updated!'
-                        });
+                    res.status(200).json({
+                        message: 'Prescription was updated!'
                     });
-                })
+                });
+            })
 
         } else {
-            res.status(401).send('Unauthorized User.');
+            res.status(401).json({
+                message: 'Unauthorized User.'
+            });
         }
     });
 }

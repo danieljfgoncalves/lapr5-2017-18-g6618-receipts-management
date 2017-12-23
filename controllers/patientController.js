@@ -2,7 +2,6 @@
 
 var roles = require('../models/roles');
 var MedicalReceipt = require('../models/medicalReceipt');
-var User = require('../models/user');
 
 // GET /api/Patient/{id}/Prescriptions/tofill/{?data} 
 exports.get_prescriptions_to_fill_until_date = (req, res) => {

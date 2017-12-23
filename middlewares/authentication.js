@@ -1,68 +1,75 @@
 // ./authentication.js
+const request = require('request');
+const jwt = require('express-jwt');
+const jwksRsa = require('jwks-rsa');
+const config = require('../config');
 
-var jwt = require('jsonwebtoken');
-var config = require('../config');
-var nodeRestClient = require('node-rest-client');
+// Authentication middleware. When used, the
+// access token must exist and be verified against
+// the Auth0 JSON Web Key Set
+exports.handleToken = jwt({
+    // Dynamically provide a signing key
+    // based on the kid in the header and 
+    // the signing keys provided by the JWKS endpoint.
+    secret: jwksRsa.expressJwtSecret({
+        cache: true,
+        rateLimit: true,
+        jwksRequestsPerMinute: 5,
+        jwksUri: `https://lapr5-3da.eu.auth0.com/.well-known/jwks.json`
+    }),
 
-exports.authenticateToken = (req, res, next) => {
+    // Validate the audience and the issuer.
+    audience: 'https://receipts-backend-api/',
+    issuer: `https://lapr5-3da.eu.auth0.com/`,
+    algorithms: ['RS256']
+});
 
-    // check header or url parameters or post parameters for token
-    var token = req.body.token || req.query.token || req.headers['x-access-token'];
+// Obtain API's token from Auth0
+exports.getApiToken = (req, res, next) => {
 
-    // decode token
-    if (token) {
-
-        // verifies secret and checks exp
-        jwt.verify(token, config.secret, (err, decoded) => {
-            if (err) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Failed to authenticate token.'
-                });
-            } else {
-                // if everything is good, save roles to request for use in other routes
-                req.roles = decoded.roles;
-                req.userID = decoded.userID;
-                next();
-            }
-        });
-
-    } else {
-
-        // if there is no token
-        // return an error
-        return res.status(403).send({
-            success: false,
-            message: 'No token provided.'
-        });
-
-    }
-}
-
-exports.authenticateToMedicinesBackend = (req, res, next) => {
-    var client = new nodeRestClient.Client();
-
-    var args = {
-        data: {
-            "Email": config.medicinesManagement.email,
-            "Password": config.medicinesManagement.secret
-        },
-        headers: {
-            "Content-Type": "application/json"
-        }
+    var options = {
+        method: 'POST',
+        url: 'https://lapr5-3da.eu.auth0.com/oauth/token',
+        headers: { 'content-type': 'application/json' },
+        body:
+            {
+                grant_type: 'client_credentials',
+                client_id: req.headers.client_id,  //   'JlBREWOiSAE87o0MZjymMkH8z5wPX7QW',
+                client_secret: req.headers.client_secret,  //   'xVeQAFK7NeZZXSJ7ZQeA2H6ouILGkGIyxBNKVPo-8W5tzDC-0o_vIwF96veW9V7b',
+                audience: 'https://lapr5-3da.eu.auth0.com/api/v2/'
+            },
+        json: true
     };
 
-    var promise = new Promise((resolve, reject) => { // register
-        var url = config.medicinesManagement.url.concat("/Account");
-        client.post(url, args, (data, response) => {
-            resolve();
-        })
+    request(options, function (error, response, body) {
+        if (error) throw new Error(error);
+
+        req.accessToken = body;
+        next();
     });
-    promise.then(() => { // login
-        var url = config.medicinesManagement.url.concat("/Account/Token");
-        client.post(url, args, (data, response) => {
-            req.token = data.token;
-            next();
-        })
+}; 
+
+exports.authenticateMedicinesManagement = (req, res, next) => {
+
+    var options = {
+        method: 'POST',
+        url: 'https://lapr5-3da.eu.auth0.com/oauth/token',
+        headers: { 'content-type': 'application/json' },
+        body: 
+        {
+            grant_type: 'client_credentials',
+            client_id: req.headers.client_id,  //   'JlBREWOiSAE87o0MZjymMkH8z5wPX7QW',
+            client_secret: req.headers.client_secret,  //   'xVeQAFK7NeZZXSJ7ZQeA2H6ouILGkGIyxBNKVPo-8W5tzDC-0o_vIwF96veW9V7b',
+            audience:"https://medicines-backend-api/"
+        },
+        json:true
+    };
+
+    request(options, function (error, response, body) {
+        if (error) throw new Error(error);
+
+        req.medicinesToken = body;
+        next();
     });
-}
+    
+};
