@@ -1,109 +1,164 @@
 // controllers/authentication.js
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const Config = require('../config');
+const Roles = require('../models/roles');
+const request = require('request');
+const _ = require("underscore");
 
-var jwt     = require('jsonwebtoken');
-var bcrypt  = require('bcryptjs');
-var config  = require('../config');
-var User    = require('../models/user');
-var roles   = require('../models/roles');
+// POST /api/signup/
+exports.signup = (req, res) => {
 
-// function to register a user
-exports.postRegistration = function (req, res) {
-
-    var hashedPassword = bcrypt.hashSync(req.body.password); // encrypt password
-
-    // Verify roles
-    var myRoles = new Set();
-    if (req.body.roles) {
-        req.body.roles.forEach(function (element) {
-            var aRole = roles.verifyRole(element);
-            if (aRole != null) myRoles.add(aRole);
-        });
-    }
-    if (myRoles.size == 0) myRoles.add(roles.Role.PATIENT);
-
-    var mobile = undefined;
-    if (req.body.mobile) mobile = req.body.mobile;
-
-    User.create({
-        name: req.body.name,
-        email: req.body.email,
-        password: hashedPassword,
-        mobile: mobile,
-        roles: Array.from(myRoles)
-    },
-        function (err, user) {
-            if (err) return res.status(500).send({ message:"There was a problem registering the user.", error: err});
-        
-            res.status(200).send({ message: "Successfully registered.", username: user.name });
-    });
-}
-
-// function to authenticate a user and reply a token
-exports.postAuthentication = function (req, res) {
-
-    // find the user
-    User.findOne({
-        name: req.body.name
-    }, function (err, user) {
-
-        if (err) throw err;
-
-        if (!user) {
-            res.status(401).json({ success: false, message: 'Authentication failed. User not found.' });
-        } else if (user) {
-
-            // check if password matches
-            if (!bcrypt.compareSync(req.body.password, user.password)) {
-                res.status(401).json({ success: false, message: 'Authentication failed. Wrong password.' });
-            } else {
-
-                // if user is found and password is right
-                // create a token with only our given payload
-                // we don't want to pass in the entire user since that has the password
-                const payload = {
-                    roles: user.roles,
-                    userID: user._id,
-                    name: user.name,
-                    email: user.email,
-                    mobile: user.mobile
-                };
-                var token = jwt.sign(payload, config.secret, {
-                    expiresIn: config.token_duration
-                });
-
-                // return the information including token as JSON
-                res.status(200).json({
-                    success: true,
-                    message: 'Enjoy your token!',
-                    token: token
-                });
+    var options = {
+        method: 'POST',
+        url: 'https://lapr5-3da.eu.auth0.com/api/v2/users',
+        headers: {
+            authorization: 'Bearer ' + req.accessToken.access_token,
+            'content-type': 'application/json'
+        },
+        body: {
+            "connection": "lapr5-user-db",
+            "email": req.body.email,
+            "username": req.body.username,
+            "password": req.body.password,
+            // "phone_number": "+199999999999999", // FIXME: Need to setup guardian first
+            "user_metadata": {
+                "mobile": req.body.mobile
+            },
+            "app_metadata": {
+                "roles": ['patient']
             }
-
+        },
+        json: true
+    };
+    request(options, function (error, response, body) {
+        if (error) throw new Error(error);
+        if (body.error) {
+            res.status(500).json({
+                error: body.error,
+                description: body.error_description
+            });
+        } else {
+            res.status(201).json({
+                message: "User Signed up successfully",
+                created_at: body.created_at,
+                user_id: body.user_id,
+                username: body.username,
+                email: body.email
+            });
         }
-
     });
-}
+};
+
+// POST /api/authenticate/
+exports.authenticate = (req, res) => {
+
+    var options = {
+        method: 'POST',
+        url: 'https://lapr5-3da.eu.auth0.com/oauth/token',
+        headers: {
+            'content-type': 'application/json'
+        },
+        body: {
+            grant_type: 'http://auth0.com/oauth/grant-type/password-realm',
+            username: req.body.username,
+            password: req.body.password,
+            audience: 'https://receipts-backend-api/',
+            scope: 'openid',
+            client_id: 'JlBREWOiSAE87o0MZjymMkH8z5wPX7QW',
+            client_secret: 'xVeQAFK7NeZZXSJ7ZQeA2H6ouILGkGIyxBNKVPo-8W5tzDC-0o_vIwF96veW9V7b',
+            realm: 'lapr5-user-db'
+        },
+        json: true
+    };
+    request(options, function (error, response, body) {
+        if (error) throw new Error(error);
+        if (body.error) {
+            res.status(500).json({
+                error: body.error,
+                description: body.error_description
+            });
+        } else {
+            res.status(201).json({
+                message: "User Authenticated! Enjoy your token",
+                token: body.access_token,
+                token_type: body.token_type
+            });
+        }
+    });
+
+};
+
+// GET /api/users/
+exports.getUsers = (req, res) => {
+
+    // https://lapr5-3da.eu.auth0.com/api/v2/users?sort=email%3A1&connection=lapr5-user-db&
+    // fields=email%2Cusername%2Cuser_id%2Cuser_metadata%2Capp_metadata&include_fields=true&search_engine=v1
+    var options = {
+        method: 'GET',
+        url: 'https://lapr5-3da.eu.auth0.com/api/v2/users?sort=email%3A1&connection=lapr5-user-db&fields=email%2Cusername%2Cuser_id%2Cuser_metadata%2Capp_metadata&include_fields=true&search_engine=v1',
+        headers: {
+            authorization: 'Bearer ' + req.accessToken.access_token,
+            'content-type': 'application/json'
+        },
+        json: true
+    };
+    request(options, function (error, response, body) {
+        if (error) throw new Error(error);
+        if (body.error) {
+            res.status(500).json({
+                error: body.error,
+                description: body.error_description
+            });
+        } else {
+            var list = _.map(body, (user) => {
+                var userDTO = {
+                    roles: user.app_metadata.roles,
+                    userID: user.user_id,
+                    username: user.username,
+                    email: user.email,
+                    mobile: (user.user_metadata) ? user.user_metadata.mobile : undefined
+                };
+                return userDTO;
+            });
+
+            res.status(201).json(list);
+        }
+    });
+};
 
 // GET /api/users/{id}
 exports.getUser = (req, res) => {
 
-    User.findById(req.params.id, (err, user) => {
-        if (err) {
-            res.status(500).send(err);
-            return;
-        }
-        if (!user) {
-            res.status(404).json({"Message":"No user found with the given ID."});
-            return;
-        }
-        var userDTO = {
-            roles: user.roles,
-            userID: user._id,
-            name: user.name,
-            email: user.email,
-            mobile: user.mobile
-        }
-        res.status(200).json(userDTO);
-    });
+    // https://lapr5-3da.eu.auth0.com/api/v2/users/auth0%7C5a393df77b89183611bb3d46?fields=email%2Cusername%2Cuser_id%2C
+    // user_metadata%2Capp_metadata&include_fields=true
+    var options = {
+        method: 'GET',
+        url: 'https://lapr5-3da.eu.auth0.com/api/v2/users/' + req.params.id + '?fields=email%2Cusername%2Cuser_id%2Cuser_metadata%2Capp_metadata&include_fields=true',
+        headers: {
+            authorization: 'Bearer ' + req.accessToken.access_token,
+            'content-type': 'application/json'
+        },
+        json: true
+    };
+    request(options, function (error, response, body) {
+        if (error) throw new Error(error);
+        if (body.error) {
+            res.status(500).json({
+                error: body.error,
+                description: body.error_description
+            });
+        } else {
+            var userDTO = {
+                roles: body.app_metadata.roles,
+                userID: body.user_id,
+                username: body.username,
+                email: body.email,
+                mobile: (body.user_metadata) ? body.user_metadata.mobile : undefined
+            };
 
+            res.status(201).json(userDTO);
+
+        }
+    });
 };
