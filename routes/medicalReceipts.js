@@ -2,13 +2,12 @@
 
 var express     = require('express');
 var router      = express.Router();
-var middlewares = require('../middleware');
-
+var auth = require('../middlewares/authentication');
 // Require controller modules
 var medical_receipts_controller = require('../controllers/medicalReceiptController');
 
-// Add Authentication middleware
-router.use('/medicalReceipts', middlewares.authenticateToken);
+// Add Authentication authentication
+router.use('/medicalReceipts', auth.handleToken, auth.getApiToken);
 
 // GET /api/medicalReceipts
 router.get('/medicalReceipts', medical_receipts_controller.get_medical_receipts_list);
@@ -17,10 +16,10 @@ router.get('/medicalReceipts', medical_receipts_controller.get_medical_receipts_
 router.get('/medicalReceipts/:id', medical_receipts_controller.get_medical_receipt);
 
 // POST /api/medicalReceipts
-router.post('/medicalReceipts', middlewares.authenticateToMedicinesBackend, medical_receipts_controller.post_medical_receipt);
+router.post('/medicalReceipts', auth.authenticateMedicinesManagement, medical_receipts_controller.post_medical_receipt);
 
 // PUT /api/medicalReceipts/{id}
-router.put('/medicalReceipts/:id', middlewares.authenticateToMedicinesBackend, medical_receipts_controller.put_medical_receipt);
+router.put('/medicalReceipts/:id', auth.authenticateMedicinesManagement, medical_receipts_controller.put_medical_receipt);
 
 // DELETE /api/medicalReceipts/{id}
 router.delete('/medicalReceipts/:id', medical_receipts_controller.delete_medical_receipt);
@@ -29,19 +28,18 @@ router.delete('/medicalReceipts/:id', medical_receipts_controller.delete_medical
 router.get('/medicalReceipts/:id/prescriptions', medical_receipts_controller.get_prescriptions_by_id);
 
 // POST /api/medicalReceipts/{id1}/Prescriptions
-router.post('/medicalReceipts/:id/prescriptions', middlewares.authenticateToMedicinesBackend, medical_receipts_controller.post_prescription);
+router.post('/medicalReceipts/:id/prescriptions', auth.authenticateMedicinesManagement, medical_receipts_controller.post_prescription);
 
 // GET /api/medicalReceipts/{id}/Prescriptions/{id}
 router.get('/medicalReceipts/:receiptId/prescriptions/:prescId', medical_receipts_controller.get_prescription_by_id);
 
 // PUT /api/medicalReceipts/{id}/Prescriptions/{id}
-router.put('/medicalReceipts/:receiptId/prescriptions/:prescId', middlewares.authenticateToMedicinesBackend, medical_receipts_controller.put_prescription_by_id);
+router.put('/medicalReceipts/:receiptId/prescriptions/:prescId', auth.authenticateMedicinesManagement, medical_receipts_controller.put_prescription_by_id);
 
 // POST /api/MedicalReceipts/{id1}/Prescriptions/{id2}/Fills
 router.post('/medicalReceipts/:id1/prescriptions/:id2/fills', medical_receipts_controller.post_fill_prescription);
 
 // PUT /api/MedicalReceipts/{id1}/Prescriptions/{id2}/Fills
 router.put('/medicalReceipts/:id1/prescriptions/:id2/fills', medical_receipts_controller.post_fill_prescription);
-
 
 module.exports = router;

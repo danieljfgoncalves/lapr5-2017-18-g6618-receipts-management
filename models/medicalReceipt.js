@@ -10,7 +10,7 @@ defaultExpirationDate.setDate(defaultExpirationDate.getDate() + 30);
 
 var PresentationSchema = new Schema({
     form: String,
-    concentration: Number,
+    concentration: String,
     quantity: Number
 });
 var FillSchema = new Schema({
@@ -43,16 +43,8 @@ var PrescriptionSchema = new Schema({
     fills: [FillSchema]
 });
 var MedicalReceiptSchema = new Schema({
-    physician: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: 'Physician ID is required.'
-    },
-    patient: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: 'Patient ID is required.'
-    },
+    physician: String,
+    patient: String,
     creationDate: {
         type: Date,
         default: Date.now

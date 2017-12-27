@@ -2,13 +2,13 @@
 
 var express     = require('express');
 var router      = express.Router();
-var middlewares = require('../middleware');
+var auth = require('../middlewares/authentication');
 
 // Require controller modules
 var patient_controller = require('../controllers/patientController');
 
-// Add Authentication middleware
-router.use('/patients', middlewares.authenticateToken);
+// Add Authentication authentication
+router.use('/patients', auth.handleToken, auth.getApiToken);
 
 // GET /api/Patients
 router.get('/patients', patient_controller.get_patients);
