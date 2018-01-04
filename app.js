@@ -11,6 +11,7 @@ const index = require('./routes/index');
 const medicalReceipts = require('./routes/medicalReceipts');
 const patients = require('./routes/patients');
 const authentication = require('./routes/authentication');
+const status = require('./routes/status_route');
 const app = express();
 
 // Views Setup
@@ -45,6 +46,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // *** REGISTER API ROUTES *** //
 app.use('/', index);
 // FIXME: uncomment
+app.use('/api/', status);
 app.use('/api/', medicalReceipts);
 app.use('/api/', patients);
 app.use('/api/', authentication);
