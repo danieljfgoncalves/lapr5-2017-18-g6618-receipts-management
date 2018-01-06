@@ -44,6 +44,10 @@ exports.getApiToken = (req, res, next) => {
     request(options, function (error, response, body) {
         if (error) throw new Error(error);
 
+        if (body.hasOwnProperty("error")) {
+            return res.status(403).send({"Message":"Unauthorized API Client"});
+        }
+
         req.accessToken = body;
         next();
     });
@@ -67,6 +71,10 @@ exports.authenticateMedicinesManagement = (req, res, next) => {
 
     request(options, function (error, response, body) {
         if (error) throw new Error(error);
+
+        if (body.hasOwnProperty("error")) {
+            return res.status(403).send({"Message":"Unauthorized API Client"});
+        }
 
         req.medicinesToken = body;
         next();
