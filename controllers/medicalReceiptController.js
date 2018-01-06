@@ -395,11 +395,19 @@ exports.get_prescriptions_by_id = function (req, res) {
 // POST /api/MedicalReceipts/{id1}/Prescriptions/{id2}/Fills
 exports.post_fill_prescription = (req, res) => {
     if (!userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN, roles.Role.PHARMACIST])) {
-        res.status(401).json({
-            message: 'Unauthorized User.'
-        });
-        return;
+        return res.status(401).json({message:'Unauthorized User.'});
     }
+
+    if (!req.body.quantity) {
+        return res.status(400).json({message:'Quantity is required!'});
+    }
+    if (isNaN(req.body.quantity)) {
+        return res.status(400).json({message:'Quantity must be a number!'});
+    }
+    if (+req.body.quantity < 1) {
+        return res.status(400).json({message:'Quantity must be bigger than 0!'});
+    }
+
     MedicalReceipt.findById(req.params.id1, (err, medicalReceipt) => {
         if (err) {
             res.json({error: err});
