@@ -8,7 +8,12 @@ module.exports = {
     // 'client_id':"JlBREWOiSAE87o0MZjymMkH8z5wPX7QW",
     // 'client_secret': 'xVeQAFK7NeZZXSJ7ZQeA2H6ouILGkGIyxBNKVPo-8W5tzDC-0o_vIwF96veW9V7b',
     'medicinesManagement': {
-        "url": "http://lapr5-g6618-medicines-management.azurewebsites.net/api"
+        'url': 'http://lapr5-g6618-medicines-management.azurewebsites.net/api'
+    },
+    'receiptsManagement': {
+        'url': 'https://lapr5-g6618-receipts-management.azurewebsites.net',
+        'client_id': 'JlBREWOiSAE87o0MZjymMkH8z5wPX7QW',
+        'client_secret': 'xVeQAFK7NeZZXSJ7ZQeA2H6ouILGkGIyxBNKVPo-8W5tzDC-0o_vIwF96veW9V7b'
     },
     'mongoURI': {
         'production': 'mongodb://admin:admin@ds161316.mlab.com:61316/lapr5-6618-receipts-management',

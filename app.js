@@ -13,6 +13,7 @@ const patients = require('./routes/patients');
 const authentication = require('./routes/authentication');
 const consolidation = require('./routes/consolidation');
 const status = require('./routes/status_route');
+const scheduler = require('./services/scheduler');
 const app = express();
 
 // Views Setup
@@ -69,6 +70,9 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500);
   res.render('error');
 });
+
+// *** SCHEDULE JOBS *** //
+scheduler.schedule();
 
 app.listen(3100, () => console.log('Receipts Management listening on port 3100!'));
 

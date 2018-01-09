@@ -3,12 +3,14 @@
  * 
  * Controller for concepts related to consolidation deadlines, etc.
  */
+const nodeRestClient = require('node-rest-client');
+const restCli = new nodeRestClient.Client();
 const MedicalReceipt = require('../models/medicalReceipt');
 const userServices = require('../services/userServices');
 const config = require('../config');
 const async = require('async');
 
-// GET /api/consolidation/threatInfo
+// POST /api/consolidation/threatInfo
 exports.threatInfo = function (req, res) {
 
     if (!req.accessToken) {
@@ -96,4 +98,20 @@ function userIsAppropriated(user) {
     }
 
     return hasProperConnection && isPatient;
+}
+
+/**
+ * Makes an http requrest to threat info route.
+ */
+exports.runThreatInfo = function() {
+    let url = config.receiptsManagement.url + '/api/consolidation/threatInfo';
+    let args = {
+        headers: {
+            client_id: config.receiptsManagement.client_id,
+            client_secret: config.receiptsManagement.client_secret
+        }
+    };
+    restCli.post(url, args, function (data, response) {
+        console.log(data);
+    });
 }
