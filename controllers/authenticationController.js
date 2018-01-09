@@ -50,6 +50,30 @@ exports.signup = (req, res) => {
     });
 };
 
+// DELETE /api/deleteAccount
+exports.deleteUser = (req, res) => {
+    var options = {
+        method: 'DELETE',
+        url: 'https://lapr5-3da.eu.auth0.com/api/v2/users/' + req.params.id,
+        headers: {
+            authorization: 'Bearer ' + req.accessToken.access_token,
+            'content-type': 'application/json'
+        }
+    };
+    request(options, function (error, response, body) {
+        if (error) throw new Error(error);
+        if (body.error) {
+            return res.status(500).json({
+                error: body.error,
+                description: body.error_description
+            });
+        } else {
+            console.log(response);
+            return res.status(response.statusCode).send(response.body);
+        }
+    });
+};
+
 // POST /api/authenticate/
 exports.authenticate = (req, res) => {
 
