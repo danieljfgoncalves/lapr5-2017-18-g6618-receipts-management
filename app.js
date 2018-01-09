@@ -11,6 +11,7 @@ const index = require('./routes/index');
 const medicalReceipts = require('./routes/medicalReceipts');
 const patients = require('./routes/patients');
 const authentication = require('./routes/authentication');
+const consolidation = require('./routes/consolidation');
 const status = require('./routes/status_route');
 const app = express();
 
@@ -50,6 +51,7 @@ app.use('/api/', status);
 app.use('/api/', medicalReceipts);
 app.use('/api/', patients);
 app.use('/api/', authentication);
+app.use('/api/', consolidation)
 
 // *** DEFAULT ERROR HANDLING *** //
 // catch 404 and forward to error handler

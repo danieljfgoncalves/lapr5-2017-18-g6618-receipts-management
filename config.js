@@ -31,5 +31,8 @@ module.exports = {
     'smsService': {
         'username': 'danielgoncalves',
         'api_key': 'NKNZETIoIuKyFkqU0rSnkXyaBqanMO'
+    },
+    'consolidation': {
+        'preservation_period': 5 // years
     }
 };

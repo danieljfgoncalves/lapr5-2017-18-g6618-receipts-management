@@ -26,7 +26,8 @@ exports.signup = (req, res) => {
                 "mobile": req.body.mobile
             },
             "app_metadata": {
-                "roles": ['patient']
+                "roles": ['patient'],
+                "lastConsolidation": new Date()
             }
         },
         json: true

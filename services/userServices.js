@@ -77,3 +77,48 @@ exports.getUser = (apiToken, userId) => {
         });
     });
 };
+
+exports.getUsers = (apiToken) => {
+
+    if (apiToken == undefined) return;
+
+    return new Promise((resolve, reject) => {
+
+        var options = {
+            method: 'GET',
+            url: 'https://lapr5-3da.eu.auth0.com/api/v2/users',
+            headers: {
+                Authorization: apiToken.token_type + " " + apiToken.access_token
+            }
+        };
+        request(options, function (error, response, body) {
+            if (error) reject(error);
+            if (body.error) reject(body.error);
+
+            resolve(JSON.parse(body));
+        });
+    });
+};
+
+exports.patchUser = (apiToken, userId, patchBody) => {
+    
+    if (apiToken == undefined || userId == undefined) return;
+
+    return new Promise((resolve, reject) => {
+        var options = {
+            method: 'PATCH',
+            url: 'https://lapr5-3da.eu.auth0.com/api/v2/users/' + userId,
+            headers: {
+                authorization: apiToken.token_type + " " + apiToken.access_token,
+                'content-type': 'application/json'
+            },
+            json: patchBody
+        };
+        request(options, function (error, response, body) {
+            if (error) {
+                return resolve(400);
+            }
+            return resolve(response.statusCode);
+        });
+    });
+}
