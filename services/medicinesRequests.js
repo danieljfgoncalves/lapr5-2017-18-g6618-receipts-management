@@ -15,8 +15,20 @@ exports.getMedicineData = (args, presentationId, medicineId, posologyId) => {
 
             if(response.statusCode == 500) reject(response.statusCode);
 
+            var medicineFound = _.find(data.medicines, (medicine) => { return medicine.id == medicineId; });
+            if (!medicineFound) {
+                return resolve(
+                    {
+                        error: 'Invalid Medicine',
+                        statusCode: 400
+                    }
+                );
+            }
+
+            var medicineName = medicineFound.name;
+
             var medData = {
-                medicine: (_.find(data.medicines, (medicine) => { return medicine.id == medicineId; })).name,
+                medicine: medicineName,
                 drug: data.drug.name,
                 presentation: {
                     id: data.id,

@@ -146,6 +146,10 @@ exports.post_medical_receipt = function (req, res) {
                 resolve(medicinesClient.getMedicineData(args, item.presentation, item.medicine, item.posology));
             }).then((data) => {
 
+                if (data.error) {
+                    return res.status(data.statusCode).send(data);
+                }
+
                 var _presentation_id = new mongoose.mongo.ObjectId(data.presentation.id);
                 var prescription = {
                     "expirationDate": item.expirationDate,
@@ -268,6 +272,10 @@ exports.put_medical_receipt = async function (req, res) {
             new Promise((resolve, rejected) => {
                 resolve(medicinesClient.getMedicineData(args, item.presentation, item.medicine, item.posology));
             }).then((data) => {
+
+                if (data.error) {
+                    return res.status(data.statusCode).send(data);
+                }
 
                 var prescription = {
                     "expirationDate": item.expirationDate,
@@ -473,6 +481,10 @@ exports.post_prescription = function (req, res) {
             resolve(medicinesClient.getMedicineData(args, req.body.presentation, req.body.medicine, req.body.posology));
         }).then((data) => {
 
+            if (data.error) {
+                return res.status(data.statusCode).send(data);
+            }
+
             var prescription = {
                 "expirationDate": req.body.expirationDate,
                 "drug": data.drug,
@@ -588,6 +600,10 @@ exports.put_prescription_by_id = function (req, res) {
             new Promise((resolve, rejected) => {
                 resolve(medicinesClient.getMedicineData(args, req.body.presentation, req.body.medicine, req.body.posology));
             }).then((data) => {
+
+                if (data.error) {
+                    return res.status(data.statusCode).send(data);
+                }
 
                 if (req.body.expirationDate) prescription.expirationDate = req.body.expirationDate;
                 if (data.drug) prescription.drug = data.drug.name;
