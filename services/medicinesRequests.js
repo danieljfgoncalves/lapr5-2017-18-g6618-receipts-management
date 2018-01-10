@@ -19,6 +19,7 @@ exports.getMedicineData = (args, presentationId, medicineId, posologyId) => {
                 medicine: (_.find(data.medicines, (medicine) => { return medicine.id == medicineId; })).name,
                 drug: data.drug.name,
                 presentation: {
+                    id: data.id,
                     form: data.form,
                     concentration: data.concentration,
                     quantity: data.packageQuantity

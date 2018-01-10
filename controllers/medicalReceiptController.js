@@ -19,82 +19,32 @@ const userServices = require('../services/userServices');
 // GET /api/medicalReceipts
 exports.get_medical_receipts_list = function (req, res) {
 
-    if (userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN, roles.Role.PATIENT, roles.Role.PHYSICIAN])) {
-
-        var query = {};
-        if (userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.PHYSICIAN])) {
-            query = {
-                "physician": req.user.sub
-            };
-        } else if (userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.PATIENT])) {
-            query = {
-                "patient": req.user.sub
-            };
-        }
-
-        MedicalReceipt.find(query, (err, medicalReceipts) => {
-            if (err) {
-                res.status(500).json({
-                    message: "Internal Error.",
-                    error: err
-                });
-            }
-            var mrs = [];
-            async.each(medicalReceipts, (medicalReceipt, callback) => {
-                // medicalReceipt.patient
-                // medicalReceipt.physician
-                Promise.join(
-                    userServices.getUser(req.accessToken, medicalReceipt.patient),
-                    userServices.getUser(req.accessToken, medicalReceipt.physician),
-                    (patient, physician) => {
-                        var medicalReceiptDTO = {
-                            "_id": medicalReceipt._id,
-                            "patient": patient,
-                            "physician": physician,
-                            "prescriptions": medicalReceipt.prescriptions,
-                            "creationDate": medicalReceipt.creationDate
-                        };
-                        // remove roles from users
-                        delete medicalReceiptDTO.patient.roles;
-                        delete medicalReceiptDTO.physician.roles;
-
-                        mrs.push(medicalReceiptDTO);
-                        callback();
-                    });
-
-            }, err2 => {
-                if (err2) {
-                    res.status(500).json({
-                        error: err2
-                    });
-                }
-                res.status(200).json(mrs);
-            });
-        });
-    } else {
-        res.status(401).json({
+    if (!userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN, roles.Role.PATIENT, roles.Role.PHYSICIAN])) {
+        return res.status(401).json({
             message: 'Unauthorized User.'
         });
     }
-};
 
-// GET /api/medicalReceipts/{id}
-exports.get_medical_receipt = function (req, res) {
+    var query = {};
+    if (userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.PHYSICIAN])) {
+        query = {
+            "physician": req.user.sub
+        };
+    } else if (userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.PATIENT])) {
+        query = {
+            "patient": req.user.sub
+        };
+    }
 
-    MedicalReceipt.findById(req.params.id, function (err, medicalReceipt) {
+    MedicalReceipt.find(query, (err, medicalReceipts) => {
         if (err) {
-            res.json({
+            return res.status(500).json({
+                message: "Internal Error.",
                 error: err
             });
         }
-
-        var b1 = userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN, roles.Role.PHARMACIST]);
-        var b2 = req.user["https://lapr5.isep.pt/roles"].includes(roles.Role.PATIENT) && req.user.sub == medicalReceipt.patient;
-        var b3 = req.user["https://lapr5.isep.pt/roles"].includes(roles.Role.PHYSICIAN) && req.user.sub == medicalReceipt.physician;
-        if (b1 || b2 || b3) {
-
-            // medicalReceipt.patient
-            // medicalReceipt.physician
+        var mrs = [];
+        async.each(medicalReceipts, (medicalReceipt, callback) => {
             Promise.join(
                 userServices.getUser(req.accessToken, medicalReceipt.patient),
                 userServices.getUser(req.accessToken, medicalReceipt.physician),
@@ -110,13 +60,61 @@ exports.get_medical_receipt = function (req, res) {
                     delete medicalReceiptDTO.patient.roles;
                     delete medicalReceiptDTO.physician.roles;
 
-                    res.status(200).json(medicalReceiptDTO);
+                    mrs.push(medicalReceiptDTO);
+                    callback();
                 });
-        } else {
-            res.status(401).json({
+
+        }, err2 => {
+            if (err2) {
+                return res.status(500).json({
+                    error: err2
+                });
+            }
+            return res.status(200).json(mrs);
+        });
+    });
+};
+
+// GET /api/medicalReceipts/{id}
+exports.get_medical_receipt = function (req, res) {
+
+    MedicalReceipt.findById(req.params.id, function (err, medicalReceipt) {
+        if (err) {
+            return res.status(400).json({error: err});
+        }
+        if (!medicalReceipt) {
+            return res.status(404).json({message: 'Medical receipt not found.'});
+        }
+
+        var b1 = userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN, roles.Role.PHARMACIST]);
+        var b2 = req.user["https://lapr5.isep.pt/roles"].includes(roles.Role.PATIENT) && req.user.sub == medicalReceipt.patient;
+        var b3 = req.user["https://lapr5.isep.pt/roles"].includes(roles.Role.PHYSICIAN) && req.user.sub == medicalReceipt.physician;
+        if ( !(b1 || b2 || b3) ) {
+            return res.status(401).json({
                 message: 'Unauthorized User.'
             });
         }
+
+        // medicalReceipt.patient
+        // medicalReceipt.physician
+        Promise.join(
+            userServices.getUser(req.accessToken, medicalReceipt.patient),
+            userServices.getUser(req.accessToken, medicalReceipt.physician),
+            (patient, physician) => {
+
+            var medicalReceiptDTO = {
+                "_id": medicalReceipt._id,
+                "patient": patient,
+                "physician": physician,
+                "prescriptions": medicalReceipt.prescriptions,
+                "creationDate": medicalReceipt.creationDate
+            };
+            // remove roles from users
+            delete medicalReceiptDTO.patient.roles;
+            delete medicalReceiptDTO.physician.roles;
+
+            return res.status(200).json(medicalReceiptDTO);
+        });
     });
 };
 
@@ -124,10 +122,9 @@ exports.get_medical_receipt = function (req, res) {
 exports.post_medical_receipt = function (req, res) {
 
     if (!userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN, roles.Role.PHYSICIAN])) {
-        res.status(401).json({
+        return res.status(401).json({
             message: 'Unauthorized User.'
         });
-        return;
     }
 
     var medicalReceipt = new MedicalReceipt();
@@ -136,9 +133,7 @@ exports.post_medical_receipt = function (req, res) {
     medicalReceipt.physician = req.user.sub;
     medicalReceipt.patient = req.body.patient;
 
-    async.each(
-        req.body.prescriptions,
-        (item, callback) => {
+    async.each(req.body.prescriptions, (item, callback) => {
 
             var args = {
                 headers: {
@@ -151,12 +146,14 @@ exports.post_medical_receipt = function (req, res) {
                 resolve(medicinesClient.getMedicineData(args, item.presentation, item.medicine, item.posology));
             }).then((data) => {
 
+                var _presentation_id = new mongoose.mongo.ObjectId(data.presentation.id);
                 var prescription = {
                     "expirationDate": item.expirationDate,
                     "drug": data.drug,
                     "medicine": data.medicine,
                     "quantity": item.quantity,
                     "presentation": {
+                        "_id": _presentation_id,
                         "form": data.presentation.form,
                         "concentration": data.presentation.concentration,
                         "quantity": data.presentation.quantity
@@ -186,7 +183,7 @@ exports.post_medical_receipt = function (req, res) {
             // save the medical receipt and check for errors
             medicalReceipt.save(err => {
                 if (err) {
-                    res.status(500).json({
+                    return res.status(500).json({
                         error: err
                     });
                 }
@@ -213,13 +210,13 @@ exports.post_medical_receipt = function (req, res) {
                         // send mail with defined transport object
                         await email.transporter.sendMail(email.mailCreatedRM(medicalReceipt, patient, physician), (error, info) => {
                             if (error) {
-                                res.status(201).json({
+                                console.log(error);
+                                return res.status(201).json({
                                     message: 'Medical Receipt Created, but email notification failed!'
                                 });
-                                return console.log(error);
                             }
                             console.log('Email sent: %s', info.messageId);
-                            res.status(201).json({
+                            return res.status(201).json({
                                 message: 'Medical Receipt Created!'
                             });
                         });
