@@ -17,9 +17,9 @@ exports.authLogs = (req, res) => {
         });
     }
     var page=0;
-    if(req.body.page)
+    if(req.page)
     {
-        page = req.body.page;
+        page = req.page;
     }
     var options = {
         method: 'GET',
