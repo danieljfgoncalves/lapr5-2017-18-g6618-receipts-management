@@ -63,17 +63,24 @@ exports.getUser = (apiToken, userId) => {
             json: true
         };
         request(options, function (error, response, body) {
-            if (error) reject(error);
-            if (body.error) reject(body.error);
+            
+            if (error || body.error) {
+                return resolve({
+                    roles: undefined,
+                    userID: undefined,
+                    username: undefined,
+                    email: undefined,
+                    mobile: undefined
+                });
+            }
 
-            var userDTO = {
+            return resolve({
                 roles: body.app_metadata.roles,
                 userID: body.user_id,
                 username: body.username,
                 email: body.email,
                 mobile: (body.user_metadata) ? body.user_metadata.mobile : undefined
-            };
-            resolve(userDTO);
+            });
         });
     });
 };
