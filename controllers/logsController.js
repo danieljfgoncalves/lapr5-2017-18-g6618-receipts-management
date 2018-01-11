@@ -19,7 +19,7 @@ exports.authLogs = (req, res) => {
 
     var options = {
         method: 'GET',
-        url: 'https://lapr5-3da.eu.auth0.com/api/v2/logs',
+        url: 'https://lapr5-3da.eu.auth0.com/api/v2/logs?q=-type%3Aseccft',
         headers: {
             authorization: 'Bearer ' + req.accessToken.access_token,
             'content-type': 'application/json'
