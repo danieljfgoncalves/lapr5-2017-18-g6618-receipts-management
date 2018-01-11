@@ -16,10 +16,14 @@ exports.authLogs = (req, res) => {
             message: 'Unauthorized User.'
         });
     }
-
+    var page=0;
+    if(req.body.page)
+    {
+        page = req.body.page;
+    }
     var options = {
         method: 'GET',
-        url: 'https://lapr5-3da.eu.auth0.com/api/v2/logs?q=type%3As%20type%3Ass%20type%3Afu%20type%3Afeccft',
+        url: 'https://lapr5-3da.eu.auth0.com/api/v2/logs?page='+page+'&per_page=100&q=type%3As%20type%3Ass%20type%3Afu%20type%3Afeccft',
         headers: {
             authorization: 'Bearer ' + req.accessToken.access_token,
             'content-type': 'application/json'
