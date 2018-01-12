@@ -165,13 +165,16 @@ exports.post_medical_receipt = function (req, res) {
                 };
 
                 if (item.posology != undefined) {
+                    var _prescribedPosology_id = new mongoose.mongo.ObjectId(data.posology.id);
                     prescription.prescribedPosology = {
+                        "_id": _prescribedPosology_id,
                         "quantity": data.posology.dosage,
                         "technique": data.posology.technique,
                         "interval": data.posology.interval,
                         "period": data.posology.period
                     };
                 } else {
+                    // FIXME should save on medicine management and save here with the same ID
                     prescription.prescribedPosology = {
                         "quantity": item.prescribedPosology.dosage,
                         "technique": item.prescribedPosology.technique,
@@ -277,20 +280,25 @@ exports.put_medical_receipt = async function (req, res) {
                     return res.status(data.statusCode).send(data);
                 }
 
+                
+                var _presentation_id = new mongoose.mongo.ObjectId(data.presentation.id);
                 var prescription = {
                     "expirationDate": item.expirationDate,
                     "drug": data.drug,
                     "medicine": data.medicine,
                     "quantity": item.quantity,
                     "presentation": {
+                        "_id": _presentation_id,
                         "form": data.presentation.form,
                         "concentration": data.presentation.concentration,
                         "quantity": data.presentation.quantity
                     }
                 };
 
+                var _prescribedPosology_id = new mongoose.mongo.ObjectId(data.posology.id);
                 if (item.posology != undefined) {
                     prescription.prescribedPosology = {
+                        "_id": _prescribedPosology_id,
                         "quantity": data.posology.dosage,
                         "technique": data.posology.technique,
                         "interval": data.posology.interval,
@@ -298,6 +306,7 @@ exports.put_medical_receipt = async function (req, res) {
                     };
                 } else {
                     prescription.prescribedPosology = {
+                        // FIXME should save on medicine management and save here with the same ID
                         "quantity": item.prescribedPosology.dosage,
                         "technique": item.prescribedPosology.technique,
                         "interval": item.prescribedPosology.interval,
