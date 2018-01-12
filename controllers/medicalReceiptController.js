@@ -133,7 +133,9 @@ exports.post_medical_receipt = function (req, res) {
 
     var medicalReceipt = new MedicalReceipt();
 
-    medicalReceipt.creationDate = req.body.creationDate;
+    if (req.body.creationDate) {
+        medicalReceipt.creationDate = req.body.creationDate;
+    }
     medicalReceipt.physician = req.user.sub;
     medicalReceipt.patient = req.body.patient;
 
@@ -205,9 +207,11 @@ exports.post_medical_receipt = function (req, res) {
                     async(patient, physician) => {
                         // send sms // put directly in mlabs "mobile": "+351936523509" because of credit
                         if (patient.mobile) {
+
+                            let cDate = medicalReceipt.creationDate ? medicalReceipt.creationDate : Date.now;
                             var text = 'Hello ' + patient.name + ',\n' +
                                 'Your medical receipt has been issue and is available since ' +
-                                moment(medicalReceipt.creationDate).format("dddd, MMMM Do YYYY") +
+                                moment(cDate).format("dddd, MMMM Do YYYY") +
                                 '.\n\nRegards,\n Dr. ' + physician.name;
 
                             await sms.Messages.send({
@@ -323,14 +327,21 @@ exports.put_medical_receipt = async function (req, res) {
         },
         error => {
             // update the medical receipt and check for errors
-            MedicalReceipt.findOneAndUpdate({
-                _id: req.params.id
-            }, {
+
+            let receiptUpdated = {
                 physician: req.user.sub,
                 patient: req.body.patient,
-                creationDate: req.body.creationDate,
                 prescriptions: newPrescriptions
-            }, (err, medicalReceipt) => {
+            }
+            if (req.body.creationDate) {
+                receiptUpdated = req.body.creationDate
+            }
+
+            MedicalReceipt.findOneAndUpdate({
+                _id: req.params.id
+            }, 
+            receiptUpdated, 
+            (err, medicalReceipt) => {
 
                 if (err) {
                     res.status(500).json({
