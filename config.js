@@ -18,7 +18,7 @@ module.exports = {
     'mongoURI': {
         'production': 'mongodb://admin:admin@ds161316.mlab.com:61316/lapr5-6618-receipts-management',
         'development': 'mongodb://admin:admin@ds161316.mlab.com:61316/lapr5-6618-receipts-management',
-        'test': 'mongodb://arqsi2017:arqsi2017@ds042677.mlab.com:42677/arqsi2017-test'
+        'test': 'mongodb://admin:admin@ds161316.mlab.com:61316/lapr5-6618-test-receipts-management'
     },
     'logger': {
         'db': 'mongodb://admin:admin@ds141796.mlab.com:41796/lapr5-6618-system-logging',
