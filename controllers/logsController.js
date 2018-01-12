@@ -5,7 +5,9 @@
  */
 const request = require('request');
 const userServices = require('../services/userServices');
-var roles = require('../models/roles');
+const MongoClient = require('mongodb').MongoClient;
+const config = require('../config'); 
+const roles = require('../models/roles');
 
 
 // GET /api/logs/auth
@@ -41,3 +43,35 @@ exports.authLogs = (req, res) => {
         return res.status(200).send(JSON.parse(body));
     });
 };
+
+// GET /api/logs/http/requests
+exports.getHttpRequests = (req, res) => {
+    MongoClient.connect(config.logger.db, 
+    function(err1, db) {
+        if(err1) {
+            return res.status(400).send(err1);
+        }
+
+        let limit = 100;
+        if (req.query.limit && !isNaN(req.query.limit)) {
+            limit = parseInt(req.query.limit);
+        }
+
+        var query = {};
+        if (req.query.where) {
+            try {
+                query = JSON.parse(req.query.where);
+            } catch(e) {
+                query = {};
+            }
+        }
+
+        var collection = db.collection('request-logs');
+        collection.find(query).limit(limit).toArray(function(err2, logs) {
+            if(err2) {
+                return res.status(400).send(err2);
+            }
+            return res.send(logs);
+        });
+    });
+}
