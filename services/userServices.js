@@ -129,3 +129,33 @@ exports.patchUser = (apiToken, userId, patchBody) => {
         });
     });
 }
+
+/**
+ * Gets an user by ID from a given list of users.
+ * 
+ * @param {*} userID the ID of the user to seek
+ * @param {*} usersList the users' list
+ * @returns promise with the user object or the ID in case the user is not found
+ */
+exports.getUserByIdFromList = (userID, usersList) => {
+    return new Promise((resolve, reject) => {
+
+        for (let i = 0; i < usersList.length; i++) {
+            let currentUser = usersList[i];
+            if (userID === currentUser.user_id) {
+                return resolve(currentUser);
+            }
+        }
+
+        return resolve(userID);
+
+    });
+}
+
+exports.mapUserShortFormat = user => {
+    return {
+        userID: user.user_id,
+        username: user.username,
+        email: user.email
+    };
+}

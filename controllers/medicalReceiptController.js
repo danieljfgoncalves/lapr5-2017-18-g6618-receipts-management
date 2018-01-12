@@ -43,35 +43,39 @@ exports.get_medical_receipts_list = function (req, res) {
                 error: err
             });
         }
-        var mrs = [];
-        async.each(medicalReceipts, (medicalReceipt, callback) => {
-            Promise.join(
-                userServices.getUser(req.accessToken, medicalReceipt.patient),
-                userServices.getUser(req.accessToken, medicalReceipt.physician),
-                (patient, physician) => {
-                    var medicalReceiptDTO = {
-                        "_id": medicalReceipt._id,
-                        "patient": patient,
-                        "physician": physician,
-                        "prescriptions": medicalReceipt.prescriptions,
-                        "creationDate": medicalReceipt.creationDate
-                    };
-                    // remove roles from users
-                    delete medicalReceiptDTO.patient.roles;
-                    delete medicalReceiptDTO.physician.roles;
 
-                    mrs.push(medicalReceiptDTO);
-                    callback();
-                });
-
-        }, err2 => {
-            if (err2) {
-                return res.status(500).json({
-                    error: err2
-                });
-            }
-            return res.status(200).json(mrs);
+        userServices.getUsers(req.accessToken).then(usersList => {
+            var mrs = [];
+            async.each(medicalReceipts, (medicalReceipt, callback) => {
+                Promise.join(
+                    userServices.getUserByIdFromList(medicalReceipt.patient, usersList),
+                    userServices.getUserByIdFromList(medicalReceipt.physician, usersList),
+                    (patient, physician) => {
+                        var medicalReceiptDTO = {
+                            "_id": medicalReceipt._id,
+                            "patient": userServices.mapUserShortFormat(patient),
+                            "physician": userServices.mapUserShortFormat(physician),
+                            "prescriptions": medicalReceipt.prescriptions,
+                            "creationDate": medicalReceipt.creationDate
+                        };
+                        // remove roles from users
+                        delete medicalReceiptDTO.patient.roles;
+                        delete medicalReceiptDTO.physician.roles;
+    
+                        mrs.push(medicalReceiptDTO);
+                        callback();
+                    });
+    
+            }, err2 => {
+                if (err2) {
+                    return res.status(500).json({
+                        error: err2
+                    });
+                }
+                return res.status(200).json(mrs);
+            });
         });
+
     });
 };
 
