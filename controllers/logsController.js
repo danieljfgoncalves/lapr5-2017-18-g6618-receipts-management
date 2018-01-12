@@ -18,28 +18,31 @@ exports.authLogs = (req, res) => {
             message: 'Unauthorized User.'
         });
     }
-    var page=0;
-    if(req.page)
-    {
-        page = req.page;
+
+    let url = 'https://lapr5-3da.eu.auth0.com/api/v2/logs';
+    var query = req.originalUrl.substr(req.originalUrl.indexOf("?") + 1);
+    if (query !== "/api/logs/auth") {
+        url += '?' + query;
     }
+
     var options = {
         method: 'GET',
-        url: 'https://lapr5-3da.eu.auth0.com/api/v2/logs?page='+page+'&per_page=100&q=type%3As%20type%3Ass%20type%3Afu%20type%3Afeccft',
+        url: url,
         headers: {
             authorization: 'Bearer ' + req.accessToken.access_token,
             'content-type': 'application/json'
         }
     };
     request(options, function (error, response, body) {
-        if (error) throw new Error(error);
+        if (error) {
+            return res.status(400).send(error);
+        }
         if (body.error) {
-            return res.status(500).json({
+            return res.status(400).json({
                 error: body.error,
                 description: body.error_description
             });
         }
-
         return res.status(200).send(JSON.parse(body));
     });
 };
