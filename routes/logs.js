@@ -15,6 +15,9 @@ router.use('/logs', auth.handleToken, auth.getApiToken);
 // GET /api/logs/auth
 router.get('/logs/auth', logsController.authLogs);
 
+// GET /api/logs/auth
+router.get('/logs/auth/login', logsController.authLoginLogs);
+
 // GET /api/logs/http/requests
 router.get('/logs/http/requests', logsController.getHttpRequests);
 
