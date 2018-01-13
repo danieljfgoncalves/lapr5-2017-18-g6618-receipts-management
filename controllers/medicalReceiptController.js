@@ -136,7 +136,17 @@ exports.post_medical_receipt = function (req, res) {
     if (req.body.creationDate) {
         medicalReceipt.creationDate = req.body.creationDate;
     }
-    medicalReceipt.physician = req.user.sub;
+
+    if (userServices.checkRole(req.user["https://lapr5.isep.pt/roles"], [roles.Role.ADMIN]) 
+    && req.body.physician) {
+        medicalReceipt.physician = req.body.physician;
+    } else {
+        medicalReceipt.physician = req.user.sub;
+    }
+
+    if (!req.body.patient) {
+        return res.status(400).json({Message:'Patient ID required!'});
+    }
     medicalReceipt.patient = req.body.patient;
 
     async.each(req.body.prescriptions, (item, callback) => {
@@ -227,12 +237,14 @@ exports.post_medical_receipt = function (req, res) {
                             if (error) {
                                 console.log(error);
                                 return res.status(201).json({
-                                    message: 'Medical Receipt Created, but email notification failed!'
+                                    message: 'Medical Receipt Created, but email notification failed!',
+                                    medicalReceipt: medicalReceipt
                                 });
                             }
                             console.log('Email sent: %s', info.messageId);
                             return res.status(201).json({
-                                message: 'Medical Receipt Created!'
+                                message: 'Medical Receipt Created!',
+                                medicalReceipt: medicalReceipt
                             });
                         });
                     });
