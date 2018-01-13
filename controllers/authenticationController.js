@@ -5,9 +5,27 @@ const Config = require('../config');
 const Roles = require('../models/roles');
 const request = require('request');
 const _ = require("underscore");
+const speakeasy = require('speakeasy');
+const QRCode = require('qrcode');
 
 // POST /api/signup/
 exports.signup = (req, res) => {
+
+    var mfa_secret;
+    if(req.body.mfa) {
+
+        const options = {
+            issuer: `Receipts Management`,
+            name: `RM (${req.body.email})`,
+            length: 64
+        }
+        const { base32, otpauth_url } = speakeasy.generateSecret(options)
+        mfa_secret = {
+            enrolled: true,
+            secret: base32,
+            otp: otpauth_url
+        }
+    }
 
     var options = {
         method: 'POST',
@@ -27,7 +45,8 @@ exports.signup = (req, res) => {
             },
             "app_metadata": {
                 "roles": ['patient'],
-                "lastConsolidation": new Date()
+                "lastConsolidation": new Date(),
+                "mfa": mfa_secret
             }
         },
         json: true
@@ -35,12 +54,31 @@ exports.signup = (req, res) => {
     request(options, function (error, response, body) {
         if (error) throw new Error(error);
         if (body.error) {
-            res.status(500).json({
-                error: body.error,
-                description: body.error_description
+            return res.status(500).json({
+                error: body
             });
+        }
+        if(mfa_secret) {
+            QRCode.toDataURL(mfa_secret.otp, gotQrCode)
+            function gotQrCode(err, qr) {
+                if (err) {
+                    return res.status(500).json({
+                        error: body.error,
+                        description: body.error_description
+                    });
+                }
+                return res.status(201).json({
+                    message: "User Signed up successfully [2FA]",
+                    created_at: body.created_at,
+                    user_id: body.user_id,
+                    username: body.username,
+                    email: body.email,
+                    qr: qr,
+                    otp: mfa_secret.otp
+                });
+            }
         } else {
-            res.status(201).json({
+            return res.status(201).json({
                 message: "User Signed up successfully",
                 created_at: body.created_at,
                 user_id: body.user_id,
@@ -50,6 +88,22 @@ exports.signup = (req, res) => {
         }
     });
 };
+
+// POST /api/authnticate/mfa
+exports.mfaAuthenticate = (req, res) => {
+
+    const success = speakeasy.totp.verify({
+        secret: req.body.secret,
+        encoding: 'base32',
+        token: req.body.token
+    });
+
+    if(success) {
+        res.status(200).json({mfa:true});
+    } else {
+        res.status(401).json({ mfa: false });
+    }
+}
 
 // DELETE /api/deleteAccount
 exports.deleteUser = (req, res) => {
@@ -107,7 +161,7 @@ exports.authenticate = (req, res) => {
             res.status(201).json({
                 message: "User Authenticated! Enjoy your token",
                 token: body.access_token,
-                token_type: body.token_type
+                token_type: body.token_type,
             });
         }
     });

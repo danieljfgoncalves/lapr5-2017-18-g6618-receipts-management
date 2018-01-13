@@ -11,6 +11,9 @@ router.post('/signup', authMiddleware.getApiToken, controller.signup);
 // POST route to authenticate (obtain token)
 router.post('/authenticate', controller.authenticate);
 
+// POST route to authenticate mfa token
+router.post('/authenticate/mfa', controller.mfaAuthenticate);
+
 // DELETE /api/deleteAccount
 router.delete('/deleteAccount/:id', authMiddleware.getApiToken, controller.deleteUser);
 
